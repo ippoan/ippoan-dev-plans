@@ -43,24 +43,42 @@ flowchart LR
 - `<scope>_<feature>` (例: `alc_kiosk_v2`, `auth_passkey_login`, `trouble_ai_summary`)
 - consumer repo のコードでは grep 可能なリテラルとして書く
 
-## consumer repo へのコピー方法
+## consumer repo の統合方法
+
+scripts は npm package `@ippoan/dev-plans-snapshot` として公開している (GHCR registry)。
 
 ```bash
-# rust-alc-api / auth-worker 等で
-mkdir -p scripts manifests .githooks
-cp /path/to/ippoan-dev-plans/scripts/{build-snapshot.js,check-snapshot.js,package.json} scripts/
-cp /path/to/ippoan-dev-plans/.githooks/pre-commit .githooks/
+# 1. 認証 (一度だけ): ~/.npmrc などに
+#    @ippoan:registry=https://npm.pkg.github.com
+#    //npm.pkg.github.com/:_authToken=<PAT with read:packages>
+#    consumer repo のルートに同内容の .npmrc を commit してもよい (token は env)
+
+# 2. consumer repo に install
+npm i -D @ippoan/dev-plans-snapshot
+
+# 3. dev-plans.config.js (consumer repo ルート)
+cat > dev-plans.config.js <<'EOF'
+export default {
+  scopeLabels: ['rust-alc-api', 'cross-repo'],          // この consumer に関係する plan のみ取得
+  grepPatterns: [/\bif_flag!\(\s*"([a-z][a-z0-9_]+)#([a-f0-9]{8})"/g],  // 2 capture group: name, sha
+  sourceDirs: ['src', 'crates'],                         // 言語/プロジェクト固有
+};
+EOF
+
+# 4. package.json に script
+#    "snapshot": "dev-plans-snapshot build",
+#    "snapshot:check": "dev-plans-snapshot check"
+
+# 5. 初期 snapshot 生成
+GITHUB_TOKEN=$(gh auth token) npm run snapshot
+git add manifests/production.snapshot.json
+
+# 6. pre-commit hook を有効化
+#    consumer repo の .githooks/pre-commit に snapshot:check を含めて
 git config core.hooksPath .githooks
-
-# 言語別に check-snapshot.js の grep パターンを編集
-# - Rust:     `if_flag!("xxx")` 形式
-# - Vue/TS:   `useFeatureFlag('xxx')` 形式
-
-# 初期 snapshot 生成
-GITHUB_TOKEN=$(gh auth token) node scripts/build-snapshot.js \
-  --owner ippoan --repo ippoan-dev-plans
-git add manifests/production.snapshot.json && git commit -m "chore: add initial snapshot"
 ```
+
+flag 識別子は `name#sha` ハイブリッド (sha = sha256(plan_id|id|source_issue) 先頭 8 桁)。同名 flag の事故を防ぎ、Issue rename / 番号変更を検知する。
 
 ## GitHub Project (kanban)
 
@@ -75,14 +93,14 @@ card の Stage 変更 → `stage:*` label 自動付与の同期は未実装。�
 
 新規 plan Issue を作成すると自動で Project に追加されるよう、Project の builtin workflow "Auto-add to project" を [Project の Workflows 設定](https://github.com/orgs/ippoan/projects/1/workflows) から有効化することを推奨 (UI 操作のみ可)。
 
-## Snapshot scripts
+## Snapshot scripts (`@ippoan/dev-plans-snapshot`)
 
-| script | 役割 |
+| CLI | 役割 |
 |---|---|
-| `scripts/build-snapshot.js` | GitHub API から `label:plan` の Issue を全 fetch → `manifests/production.snapshot.json` 生成 |
-| `scripts/check-snapshot.js` | snapshot の `issues_last_updated_at` と GitHub API 上の最新 updatedAt を比較 → drift 検出 / コードが参照する flag が snapshot に存在するか / removed flag が残ってないか確認 |
+| `dev-plans-snapshot build` | GitHub API から `label:plan` の Issue を fetch → `manifests/production.snapshot.json` 生成 (per-flag SHA 付き) |
+| `dev-plans-snapshot check` | drift 検出 + コードの `if_flag!("name#sha")` 参照が snapshot に存在するか + removed flag の残存確認 |
 
-両 script は **consumer repo にコピーして使う雛形**。詳細はファイル冒頭のコメント参照。
+リリースは `scripts/snapshot-pkg-v*` タグを push すると `.github/workflows/publish.yml` が GHCR registry へ npm publish する。
 
 ## Pre-commit hook
 

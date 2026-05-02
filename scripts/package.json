@@ -1,9 +1,17 @@
 {
-  "name": "ippoan-dev-plans-scripts",
+  "name": "@ippoan/dev-plans-snapshot",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "description": "Snapshot build/check scripts for ippoan-dev-plans (and consumer repos to copy)",
+  "description": "Snapshot build/check tool for ippoan plan-as-issue management. Fetches GitHub Issues labeled 'plan' from a central repo, generates manifests/production.snapshot.json with per-flag SHA, and verifies code references against the snapshot.",
+  "bin": {
+    "dev-plans-snapshot": "./cli.js"
+  },
+  "files": [
+    "build-snapshot.js",
+    "check-snapshot.js",
+    "cli.js",
+    "config.js"
+  ],
   "scripts": {
     "build": "node build-snapshot.js",
     "check": "node check-snapshot.js"
@@ -11,5 +19,16 @@
   "dependencies": {
     "@octokit/rest": "^21.0.2",
     "yaml": "^2.6.1"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ippoan/ippoan-dev-plans.git",
+    "directory": "scripts"
+  },
+  "homepage": "https://github.com/ippoan/ippoan-dev-plans#readme",
+  "license": "UNLICENSED"
 }

@@ -1,36 +1,23 @@
 #!/usr/bin/env node
 /**
- * build-snapshot.js
+ * Fetch plan issues from the central repo, extract YAML flag definitions
+ * from their bodies, attach a per-flag SHA, and write
+ * `<repo-root>/manifests/production.snapshot.json`.
  *
- * GitHub API から `label:plan` の Issue を全 fetch し、
- * 本文中の ```yaml ... ``` block を flag 定義として抽出して
- * `manifests/production.snapshot.json` を生成する。
+ * Config sources (precedence high→low):
+ *   1. env: SCOPE_LABELS, PLANS_OWNER, PLANS_REPO
+ *   2. <repo-root>/dev-plans.config.js (default export)
+ *   3. built-in defaults (owner=ippoan, repo=ippoan-dev-plans, no scope filter)
  *
- * Usage:
- *   GITHUB_TOKEN=xxx node build-snapshot.js [--owner <org>] [--repo <name>]
- *
- * これは「雛形」。consumer repo にコピーして使うときは:
- * - owner/repo を実際の plan 集約 repo (ippoan/ippoan-dev-plans) に固定
- * - manifests/ の出力先を必要に応じて変更
+ * Auth: GITHUB_TOKEN or GH_TOKEN env var.
  */
 
 import { Octokit } from "@octokit/rest";
 import { parse as parseYaml } from "yaml";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "..");
-
-function parseArgs(argv) {
-  const out = { owner: "ippoan", repo: "ippoan-dev-plans" };
-  for (let i = 2; i < argv.length; i++) {
-    if (argv[i] === "--owner") out.owner = argv[++i];
-    else if (argv[i] === "--repo") out.repo = argv[++i];
-  }
-  return out;
-}
+import crypto from "node:crypto";
+import { loadConfig, repoRoot } from "./config.js";
 
 function extractYamlBlock(body) {
   if (!body) return null;
@@ -46,7 +33,7 @@ function extractYamlBlock(body) {
 
 function pickStage(labels) {
   const stages = labels
-    .map((l) => l.name)
+    .map((l) => (typeof l === "string" ? l : l.name))
     .filter((n) => n.startsWith("stage:"))
     .map((n) => n.slice("stage:".length));
   return stages[0] ?? "proposed";
@@ -54,13 +41,28 @@ function pickStage(labels) {
 
 function pickScope(labels) {
   return labels
-    .map((l) => l.name)
+    .map((l) => (typeof l === "string" ? l : l.name))
     .filter((n) => n.startsWith("scope:"))
     .map((n) => n.slice("scope:".length));
 }
 
+function computeSha(planId, id, sourceIssue) {
+  return crypto
+    .createHash("sha256")
+    .update(`${planId}|${id}|${sourceIssue}`)
+    .digest("hex")
+    .slice(0, 8);
+}
+
+function matchesScope(labels, scopeLabels) {
+  if (!scopeLabels || scopeLabels.length === 0) return true;
+  const wanted = new Set(scopeLabels.map((s) => `scope:${s}`));
+  return labels.some((l) => wanted.has(typeof l === "string" ? l : l.name));
+}
+
 async function main() {
-  const { owner, repo } = parseArgs(process.argv);
+  const config = await loadConfig();
+  const { owner, repo, scopeLabels } = config;
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!token) {
     console.error("GITHUB_TOKEN or GH_TOKEN env var required");
@@ -76,9 +78,12 @@ async function main() {
     state: "all",
     per_page: 100,
   });
-  // PR を除外 (listForRepo は PR を含む)
-  const planIssues = issues.filter((i) => !i.pull_request);
-  console.error(`Found ${planIssues.length} plan issues`);
+  const planIssues = issues
+    .filter((i) => !i.pull_request)
+    .filter((i) => matchesScope(i.labels, scopeLabels));
+  console.error(
+    `Found ${planIssues.length} plan issues (scope filter: ${scopeLabels ? scopeLabels.join(",") : "none"})`,
+  );
 
   const flags = [];
   let lastUpdated = "1970-01-01T00:00:00Z";
@@ -87,13 +92,13 @@ async function main() {
     if (issue.updated_at > lastUpdated) lastUpdated = issue.updated_at;
 
     const def = extractYamlBlock(issue.body);
-    if (!def || typeof def !== "object" || !def.id) {
-      // yaml block 無し or id 欠如 → flag 定義としては記録しない (Issue 自体は last_updated に反映済)
-      continue;
-    }
+    if (!def || typeof def !== "object" || !def.id) continue;
+
+    const planId = def.plan_id ?? null;
     flags.push({
       id: def.id,
-      plan_id: def.plan_id ?? null,
+      sha: computeSha(planId, def.id, issue.number),
+      plan_id: planId,
       stage: pickStage(issue.labels),
       scope: pickScope(issue.labels),
       owner: def.owner ?? null,
@@ -105,19 +110,22 @@ async function main() {
     });
   }
 
-  flags.sort((a, b) => a.id.localeCompare(b.id));
+  flags.sort((a, b) => a.id.localeCompare(b.id) || a.sha.localeCompare(b.sha));
 
   const snapshot = {
     generated_at: new Date().toISOString(),
     issues_last_updated_at: lastUpdated,
     source: { owner, repo },
+    scope_filter: scopeLabels ?? null,
     flags,
   };
 
-  const outPath = path.join(REPO_ROOT, "manifests", "production.snapshot.json");
+  const outPath = path.join(repoRoot(), "manifests", "production.snapshot.json");
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2) + "\n");
-  console.error(`Wrote ${outPath} (${flags.length} flags, last_updated=${lastUpdated})`);
+  console.error(
+    `Wrote ${outPath} (${flags.length} flags, last_updated=${lastUpdated})`,
+  );
 }
 
 main().catch((err) => {
