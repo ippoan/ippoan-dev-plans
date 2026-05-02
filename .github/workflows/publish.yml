@@ -1,0 +1,45 @@
+name: Publish snapshot package
+
+on:
+  push:
+    tags:
+      - 'snapshot-pkg-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. snapshot-pkg-v0.1.0)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: scripts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@ippoan'
+
+      - name: Verify package.json version matches tag
+        if: startsWith(github.ref, 'refs/tags/snapshot-pkg-v')
+        run: |
+          PKG_VER=$(node -p "require('./package.json').version")
+          TAG_VER="${GITHUB_REF#refs/tags/snapshot-pkg-v}"
+          if [[ "$PKG_VER" != "$TAG_VER" ]]; then
+            echo "::error::package.json version ($PKG_VER) != tag ($TAG_VER)"
+            exit 1
+          fi
+          echo "Publishing @ippoan/dev-plans-snapshot@$PKG_VER"
+
+      - run: npm install --no-audit --no-fund
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
