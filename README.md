@@ -64,9 +64,16 @@ git add manifests/production.snapshot.json && git commit -m "chore: add initial 
 
 ## GitHub Project (kanban)
 
-`ALC Release Pipeline` Project (https://github.com/orgs/ippoan/projects) で全 plan を column 形式で可視化。Status field は 9 stage に対応。
+[ALC Release Pipeline](https://github.com/orgs/ippoan/projects/1) で全 plan を column 形式で可視化。
 
-card の column 移動 → label 自動付与は GitHub Project 標準の Workflow を UI で有効化済み (将来的に `.github/workflows/sync-project-labels.yml` で完全自動化予定)。
+- **Stage** カスタム field (single-select) が 9 stage を表現:
+  Proposed / Approved / Implementing / Applied / Internal / Early / GA / Deprecated / Removed
+- 標準の **Status** field (Todo / In Progress / Done) は別軸の workflow indicator として残す
+- Board view で Stage を group-by すると 9 column のカンバンになる
+
+card の Stage 変更 → `stage:*` label 自動付与の同期は未実装。当面手動運用 (`gh issue edit <N> --add-label stage:approved` 等)。将来的に `.github/workflows/sync-project-labels.yml` で完全自動化予定。
+
+新規 plan Issue を作成すると自動で Project に追加されるよう、Project の builtin workflow "Auto-add to project" を [Project の Workflows 設定](https://github.com/orgs/ippoan/projects/1/workflows) から有効化することを推奨 (UI 操作のみ可)。
 
 ## Snapshot scripts
 
