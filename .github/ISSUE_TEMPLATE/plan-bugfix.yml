@@ -1,0 +1,59 @@
+name: "Plan: Bugfix"
+description: feature flag を伴わない単純なバグ修正 plan
+title: "[Plan] "
+labels: ["plan", "stage:proposed", "type:bugfix"]
+body:
+  - type: input
+    id: plan_id
+    attributes:
+      label: Plan ID
+      placeholder: "20260502_003_fix_xxx"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      multiple: true
+      options:
+        - rust-alc-api
+        - auth-worker
+        - nuxt-trouble
+        - nuxt-notify
+        - ci-dashboard
+        - cross-repo
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: バグの内容と根本原因
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      value: |
+        - [ ] 修正実装
+        - [ ] regression テスト追加
+        - [ ] 関連 PR merge
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: 修正の確認方法 (再現手順 / regression test 名)
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References

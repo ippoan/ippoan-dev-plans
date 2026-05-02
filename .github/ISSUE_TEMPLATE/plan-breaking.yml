@@ -1,0 +1,108 @@
+name: "Plan: Breaking"
+description: expand/contract が必要な互換性の壊れる変更 plan
+title: "[Plan] "
+labels: ["plan", "stage:proposed", "type:breaking"]
+body:
+  - type: input
+    id: plan_id
+    attributes:
+      label: Plan ID
+      placeholder: "20260502_004_breaking_xxx"
+    validations:
+      required: true
+
+  - type: input
+    id: flag_name
+    attributes:
+      label: Flag name
+      description: "snake_case + scope prefix"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      multiple: true
+      options:
+        - rust-alc-api
+        - auth-worker
+        - nuxt-trouble
+        - nuxt-notify
+        - ci-dashboard
+        - cross-repo
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: 何が壊れるか / なぜ必要か
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition
+    attributes:
+      label: Flag definition
+      description: "snapshot に取り込まれる YAML block (```yaml で囲む)"
+      value: |
+        ```yaml
+        id: alc_xxx_v2
+        plan_id: 20260502_004_breaking_xxx
+        owner: "@yhonda-ohishi"
+        default_value: false
+        rollout:
+          internal: true
+          early: false
+          ga: false
+        expires_at: "2026-08-01"
+        ```
+    validations:
+      required: true
+
+  - type: input
+    id: expand_plan_link
+    attributes:
+      label: Expand plan link
+      description: "新旧両対応の expand plan Issue URL"
+      placeholder: "https://github.com/ippoan/ippoan-dev-plans/issues/N"
+    validations:
+      required: true
+
+  - type: input
+    id: switch_plan_link
+    attributes:
+      label: Switch plan link
+      description: "default を新方式に切り替える plan Issue URL"
+    validations:
+      required: true
+
+  - type: input
+    id: contract_plan_link
+    attributes:
+      label: Contract plan link
+      description: "旧方式を削除する plan Issue URL"
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback
+      description: 各 stage (expand/switch/contract) ごとの戻し方
+    validations:
+      required: true
+
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test plan
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References

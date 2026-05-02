@@ -1,0 +1,15 @@
+{
+  "name": "ippoan-dev-plans-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Snapshot build/check scripts for ippoan-dev-plans (and consumer repos to copy)",
+  "scripts": {
+    "build": "node build-snapshot.js",
+    "check": "node check-snapshot.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.2",
+    "yaml": "^2.6.1"
+  }
+}

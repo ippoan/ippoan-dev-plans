@@ -1,0 +1,104 @@
+name: "Plan: Feature"
+description: feature flag を伴う新機能 plan
+title: "[Plan] "
+labels: ["plan", "stage:proposed", "type:feature"]
+body:
+  - type: input
+    id: plan_id
+    attributes:
+      label: Plan ID
+      description: "YYYYMMDD_NNN_short_slug 形式 (例: 20260502_002_alc_kiosk_v2)"
+      placeholder: "20260502_002_xxx"
+    validations:
+      required: true
+
+  - type: input
+    id: flag_name
+    attributes:
+      label: Flag name
+      description: "snake_case + scope prefix (例: alc_xxx, auth_xxx, trouble_xxx)"
+      placeholder: "alc_new_kiosk_layout"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: 影響を受ける repo (複数可)
+      multiple: true
+      options:
+        - rust-alc-api
+        - auth-worker
+        - nuxt-trouble
+        - nuxt-notify
+        - ci-dashboard
+        - cross-repo
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: 何を作るか / なぜ作るか (背景・目的)
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition
+    attributes:
+      label: Flag definition
+      description: |
+        snapshot に取り込まれる YAML block。**コードブロックは ```yaml で囲むこと**。
+        フィールドは `docs/examples/feature-plan-example.md` を参照。
+      value: |
+        ```yaml
+        id: alc_xxx
+        plan_id: 20260502_002_xxx
+        owner: "@yhonda-ohishi"
+        default_value: false
+        rollout:
+          internal: true
+          early: false
+          ga: false
+        expires_at: "2026-08-01"
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: 実装タスクの checklist
+      value: |
+        - [ ] backend 実装
+        - [ ] frontend 実装
+        - [ ] テスト追加
+        - [ ] snapshot に flag 反映
+        - [ ] consumer repo merge
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback
+      description: 失敗時の戻し方 (flag を default_value に戻す手順、関連 PR の revert 等)
+    validations:
+      required: true
+
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: Test plan
+      description: 動作確認方法 (E2E / staging / canary)
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: 関連 Issue / PR / Slack スレ等

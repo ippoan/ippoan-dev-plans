@@ -1,0 +1,49 @@
+#!/bin/bash
+# pre-commit hook: snapshot drift / flag 漏れを検出
+#
+# 有効化: git config core.hooksPath .githooks
+# 無効化: git config --unset core.hooksPath
+#
+# これは consumer repo にコピーする雛形。
+# scripts/ と manifests/ の path は同じ前提。
+
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+SNAPSHOT="$ROOT/manifests/production.snapshot.json"
+BUILD="$ROOT/scripts/build-snapshot.js"
+CHECK="$ROOT/scripts/check-snapshot.js"
+
+if [[ ! -f "$BUILD" || ! -f "$CHECK" ]]; then
+  # snapshot scripts が無い repo では何もしない
+  exit 0
+fi
+
+# GITHUB_TOKEN が無いと API 叩けない → skip (CI で確実に走るのでローカルは緩く)
+if [[ -z "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ]]; then
+  if command -v gh >/dev/null 2>&1; then
+    export GITHUB_TOKEN=$(gh auth token 2>/dev/null || true)
+  fi
+fi
+if [[ -z "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ]]; then
+  echo "[pre-commit] GITHUB_TOKEN unavailable, skipping snapshot check" >&2
+  exit 0
+fi
+
+if [[ ! -f "$SNAPSHOT" ]]; then
+  echo "[pre-commit] snapshot not found, generating..." >&2
+  if ! node "$BUILD"; then
+    echo "[pre-commit] failed to build snapshot" >&2
+    exit 1
+  fi
+  echo "[pre-commit] snapshot generated. add it and re-commit:" >&2
+  echo "  git add manifests/production.snapshot.json && git commit" >&2
+  exit 1
+fi
+
+if ! node "$CHECK"; then
+  echo "" >&2
+  echo "[pre-commit] snapshot drift / flag mismatch detected" >&2
+  echo "  rerun: node scripts/build-snapshot.js && git add manifests/" >&2
+  exit 1
+fi
